@@ -157,3 +157,12 @@ def test_episodes_get_distinct_output_paths(tmp_path, monkeypatch):
     render_episode("p1", FakeProviders(chat_reply=EP1), str(tmp_path), Bible(str(tmp_path)))
     render_episode("p2", FakeProviders(chat_reply=EP1), str(tmp_path), Bible(str(tmp_path)).load())
     assert [os.path.basename(o) for o in outs] == ["episode1.mp4", "episode2.mp4"]  # no overwrite
+
+
+def test_render_shot_unknown_character_falls_back_to_narration(tmp_path):
+    b = Bible(str(tmp_path))
+    b.style = "flat 2D anime"  # empty cast; "Ghost" is never defined
+    p = FakeProviders()
+    shot = render_shot(Shot(0, "Ghost", "hall", "appears"), b, p, str(tmp_path))
+    assert "flat 2D anime" in shot.prompt and "appears" in shot.prompt  # narration fallback, no crash
+    assert os.path.exists(shot.clip)

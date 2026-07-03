@@ -11,12 +11,14 @@ from canon.edit import concat
 
 
 def render_shot(shot, bible, providers, work_dir, max_regen=MAX_REGEN):
-    if shot.character:
-        c = bible.characters[shot.character]  # writer-created characters are in the bible by now
+    if shot.character and shot.character in bible.characters:
+        c = bible.characters[shot.character]
         shot.prompt = bible.prompt_for(shot.character, shot.action)
         seed, ref = c.seed, c.ref_image
     else:
-        shot.prompt = f"{bible.style}, {shot.action}"  # narration / establishing shot
+        # narration/establishing shot, or a character the writer named but never defined:
+        # degrade to a style+action prompt rather than crashing mid-episode.
+        shot.prompt = f"{bible.style}, {shot.action}"
         seed, ref = 0, None
 
     # Filenames key off the integer shot index, never the model-supplied character name,
@@ -57,7 +59,8 @@ def render_episode(premise, providers, series_dir, bible):
     """Full episode: Writer -> seed the Bible (episode 1 only) -> canonical refs -> render each shot
     through the QC loop -> stitch. Episodes after the first reuse the existing Bible unchanged, which
     is what keeps characters consistent across episodes."""
-    script, chars = write_script(providers, premise)
+    known = {n: c.descriptor for n, c in bible.characters.items()} or None  # ep2+: reuse the cast
+    script, chars = write_script(providers, premise, known)
     if not bible.characters:  # episode 1 seeds the canon; later episodes reuse it
         bible.style = script.style
         for c in chars:

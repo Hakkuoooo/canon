@@ -73,3 +73,15 @@ def test_write_script_uses_chat_boundary():
     assert p.calls["chat"] == 1
     assert chars[0].name == "Mara" and len(script.shots) == 2
     assert WRITER_SYS  # a non-empty system prompt is defined
+
+
+def test_write_script_injects_known_roster_for_later_episodes():
+    class Recording(FakeProviders):
+        def chat(self, system, user):
+            self.last_user = user
+            return super().chat(system, user)
+
+    p = Recording(chat_reply=json.dumps(GOOD))
+    write_script(p, "episode 2", known={"Mara": "red jacket"})
+    assert "Mara" in p.last_user and "red jacket" in p.last_user
+    assert "REUSE" in p.last_user.upper()  # the writer is told to reuse the cast

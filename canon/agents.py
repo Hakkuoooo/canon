@@ -47,6 +47,14 @@ def parse_script(raw: str, premise: str):
     return Script(premise=premise, style=str(data.get("style", DEFAULT_STYLE)), shots=shots), chars
 
 
-def write_script(providers, premise: str):
-    """Run the Writer agent over the chat() boundary and parse its reply."""
-    return parse_script(providers.chat(WRITER_SYS, premise), premise)
+def write_script(providers, premise: str, known=None):
+    """Run the Writer agent over the chat() boundary and parse its reply. For a later episode,
+    pass `known` (name -> descriptor) so the Writer reuses the existing cast instead of inventing one."""
+    user = premise
+    if known:
+        roster = "; ".join(f"{n}: {d}" for n, d in known.items())
+        user = (
+            f"{premise}\n\nThis is a later episode of an existing series. REUSE these exact "
+            f"characters (same names and looks), do not invent new ones: {roster}"
+        )
+    return parse_script(providers.chat(WRITER_SYS, user), premise)
