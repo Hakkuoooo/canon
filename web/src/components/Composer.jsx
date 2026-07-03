@@ -1,13 +1,14 @@
 import { useState } from 'react'
-import { Sparkles, ArrowRight, Hash, Film } from 'lucide-react'
+import { Sparkles, ArrowRight, Hash, Film, Loader } from 'lucide-react'
 
 const STYLES = ['Flat Anime', 'Ink Wash', 'Cel Noir', 'Storybook']
 
-export default function Composer() {
+export default function Composer({ onGenerate, status }) {
   const [premise, setPremise] = useState(
     'Two estranged siblings inherit a locked vault, and the only key is a memory neither of them trusts.',
   )
   const [active, setActive] = useState('Flat Anime')
+  const busy = status === 'running'
 
   return (
     <div className="rounded-2xl border border-line bg-cream p-6 shadow-[0_1px_0_rgba(0,0,0,0.02),0_24px_48px_-36px_rgba(38,32,25,0.4)] md:p-8">
@@ -56,10 +57,20 @@ export default function Composer() {
             6 shots
           </span>
         </div>
-        <button className="group inline-flex items-center justify-center gap-2 rounded-full bg-ink px-6 py-3 text-[14px] font-medium text-cream transition-transform active:scale-[0.98]">
-          <Sparkles className="h-4 w-4 text-sage" strokeWidth={1.5} />
-          Generate episode
-          <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" strokeWidth={1.5} />
+        <button
+          onClick={() => onGenerate?.(premise, active)}
+          disabled={busy || !premise.trim()}
+          className="group inline-flex items-center justify-center gap-2 rounded-full bg-ink px-6 py-3 text-[14px] font-medium text-cream transition-transform active:scale-[0.98] disabled:opacity-50"
+        >
+          {busy ? (
+            <Loader className="h-4 w-4 animate-spin text-sage" strokeWidth={1.5} />
+          ) : (
+            <Sparkles className="h-4 w-4 text-sage" strokeWidth={1.5} />
+          )}
+          {busy ? 'Generating…' : 'Generate episode'}
+          {!busy && (
+            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" strokeWidth={1.5} />
+          )}
         </button>
       </div>
     </div>
