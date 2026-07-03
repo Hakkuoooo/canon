@@ -2,10 +2,10 @@ import { PenLine, Camera, Clapperboard, ScanEye, Scissors, Check, TriangleAlert 
 
 const STEPS = [
   { id: 'writer', label: 'Writer', icon: PenLine, note: 'script + cast' },
-  { id: 'cinematographer', label: 'Cinematographer', icon: Camera, note: 'shot list' },
-  { id: 'generator', label: 'Generator', icon: Clapperboard, note: 'frames + motion' },
+  { id: 'cinematographer', label: 'Cinematographer', icon: Camera, note: 'framing + motion' },
+  { id: 'generator', label: 'Generator', icon: Clapperboard, note: 'render, fix drift' },
   { id: 'qc', label: 'QC Critic', icon: ScanEye, note: 'consistency check' },
-  { id: 'editor', label: 'Editor', icon: Scissors, note: 'voice + final cut' },
+  { id: 'editor', label: 'Editor', icon: Scissors, note: 'title + voice + cut' },
 ]
 
 function Dot({ state }) {

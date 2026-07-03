@@ -166,3 +166,29 @@ def test_render_shot_unknown_character_falls_back_to_narration(tmp_path):
     shot = render_shot(Shot(0, "Ghost", "hall", "appears"), b, p, str(tmp_path))
     assert "flat 2D anime" in shot.prompt and "appears" in shot.prompt  # narration fallback, no crash
     assert os.path.exists(shot.clip)
+
+
+def test_render_shot_appends_cinematographer_framing(tmp_path):
+    p = FakeProviders()
+    shot = render_shot(Shot(0, "Mara", "hall", "runs"), _bible(tmp_path), p, str(tmp_path),
+                       framing="wide, low angle")
+    assert "wide, low angle" in shot.prompt
+
+
+def test_generator_revises_prompt_on_qc_drift(tmp_path):
+    # QC fails once; the Generator agent should call chat() to revise before retrying.
+    p = FakeProviders(vl_results=[{"ok": False, "reason": "jacket drifted"}, {"ok": True, "reason": "ok"}])
+    render_shot(Shot(0, "Mara", "hall", "runs"), _bible(tmp_path), p, str(tmp_path), max_regen=1)
+    assert p.calls["chat"] == 1 and p.calls["gen_image"] == 2  # one revision, one regeneration
+
+
+def test_render_episode_writes_editor_title(tmp_path, monkeypatch):
+    _patch_concat(monkeypatch)
+    reply = json.dumps({
+        "title": "The Vault", "logline": "Two siblings, one lock.",
+        "style": "anime", "characters": [{"name": "Mara", "descriptor": "d", "seed": 1}],
+        "shots": [{"character": "Mara", "setting": "v", "action": "a"}],
+    })
+    render_episode("p", FakeProviders(chat_reply=reply), str(tmp_path), Bible(str(tmp_path)))
+    meta = json.load(open(os.path.join(str(tmp_path), "episode1.json")))
+    assert meta["title"] == "The Vault"

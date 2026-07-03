@@ -2,6 +2,7 @@
 series_id is validated as a strict slug before it ever touches the filesystem — this is the
 path-traversal boundary the Bible module deferred to the API. Generation is synchronous here
 (fine offline and for a pre-generated demo); a job queue is the scale answer, out of scope."""
+import json
 import os
 import re
 import uuid
@@ -59,8 +60,15 @@ def create_episode(series_id: str, req: EpisodeReq):
     premise = req.premise if not req.style else f"{req.premise}\n\nVisual style: {req.style}."
     out = render_episode(premise, get_providers(), d, bible)
     n = int(re.search(r"episode(\d+)\.mp4$", out).group(1))
+    meta = {}
+    meta_path = os.path.join(d, f"episode{n}.json")
+    if os.path.exists(meta_path):
+        with open(meta_path, encoding="utf-8") as f:
+            meta = json.load(f)
     return {
         "episode": n,
+        "title": meta.get("title"),
+        "logline": meta.get("logline"),
         "video_url": f"/api/series/{series_id}/episodes/{n}/video",
         "style": bible.style,
         "characters": _characters(bible),

@@ -2,9 +2,17 @@ import json
 
 import pytest
 
-from canon.agents import parse_script, write_script, WRITER_SYS
+from canon.agents import (
+    direct_shots,
+    parse_script,
+    plan_edit,
+    revise_prompt,
+    write_script,
+    WRITER_SYS,
+)
 from canon.config import MAX_SHOTS
 from canon.providers import FakeProviders
+from canon.schemas import Script, Shot
 
 GOOD = {
     "style": "flat 2D anime",
@@ -85,3 +93,37 @@ def test_write_script_injects_known_roster_for_later_episodes():
     write_script(p, "episode 2", known={"Mara": "red jacket"})
     assert "Mara" in p.last_user and "red jacket" in p.last_user
     assert "REUSE" in p.last_user.upper()  # the writer is told to reuse the cast
+
+
+def _script(n=2):
+    return Script(premise="p", style="anime", shots=[Shot(i, "A", "room", f"acts {i}") for i in range(n)])
+
+
+def test_direct_shots_returns_one_framing_per_shot():
+    p = FakeProviders(chat_reply='{"shots": ["wide, low angle", "close-up, push in"]}')
+    notes = direct_shots(p, _script(2))
+    assert len(notes) == 2 and "wide" in notes[0]
+
+
+def test_direct_shots_falls_back_when_output_bad():
+    p = FakeProviders(chat_reply="the model rambled with no json")
+    notes = direct_shots(p, _script(3))
+    assert len(notes) == 3 and all(n.strip() for n in notes)  # padded with a neutral note
+
+
+def test_plan_edit_returns_title_and_logline():
+    p = FakeProviders(chat_reply='{"title": "The Vault", "logline": "Two siblings, one lock."}')
+    plan = plan_edit(p, _script())
+    assert plan["title"] == "The Vault" and "siblings" in plan["logline"]
+
+
+def test_plan_edit_falls_back_on_bad_output():
+    p = FakeProviders(chat_reply="no json here")
+    plan = plan_edit(p, _script())
+    assert plan["title"] and "logline" in plan
+
+
+def test_revise_prompt_returns_corrected_text():
+    p = FakeProviders(chat_reply="flat 2D anime, red jacket, corrected lighting")
+    revised = revise_prompt(p, "flat 2D anime, red jacket", "jacket too dark")
+    assert "corrected" in revised

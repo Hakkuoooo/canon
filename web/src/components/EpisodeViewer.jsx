@@ -18,8 +18,11 @@ export default function EpisodeViewer({ episodes = [] }) {
             Screening room
           </div>
           <h2 className="mt-3 font-display text-[30px] leading-none tracking-[-0.01em] text-ink md:text-[38px]">
-            {episodes.length ? `Episode ${String(current?.episode).padStart(2, '0')}` : 'No episodes yet'}
+            {episodes.length
+              ? current?.title || `Episode ${String(current?.episode).padStart(2, '0')}`
+              : 'No episodes yet'}
           </h2>
+          {current?.logline && <p className="mt-3 max-w-xl text-[14px] text-ink-soft">{current.logline}</p>}
         </div>
         {episodes.length > 0 && (
           <div className="flex items-center gap-1 rounded-full border border-line bg-cream p-1">

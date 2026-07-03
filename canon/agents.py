@@ -58,3 +58,58 @@ def write_script(providers, premise: str, known=None):
             f"characters (same names and looks), do not invent new ones: {roster}"
         )
     return parse_script(providers.chat(WRITER_SYS, user), premise)
+
+
+def _extract_json(raw):
+    return json.loads(raw[raw.find("{") : raw.rfind("}") + 1])
+
+
+CINE_SYS = (
+    "You are a cinematographer. For each numbered shot give ONE short camera direction "
+    "(shot size, angle, motion), no prose. Output STRICT JSON {\"shots\": [\"...\", ...]} "
+    "with one string per shot, in order."
+)
+
+
+def direct_shots(providers, script):
+    """Cinematographer agent: one camera/framing note per shot. Falls back to a neutral note."""
+    scenes = "; ".join(f"{i}: {s.setting}, {s.action}" for i, s in enumerate(script.shots))
+    try:
+        notes = [str(x) for x in _extract_json(providers.chat(CINE_SYS, scenes))["shots"]]
+    except (ValueError, KeyError, TypeError):
+        notes = []
+    return [
+        notes[i] if i < len(notes) and notes[i].strip() else "medium shot, eye level"
+        for i in range(len(script.shots))
+    ]
+
+
+REVISE_SYS = (
+    "You fix an image prompt that failed a consistency check. Return only the corrected prompt "
+    "text on one line, keeping the character description intact and addressing the problem."
+)
+
+
+def revise_prompt(providers, prompt, reason):
+    """Generator agent: rewrite a prompt to fix a flagged drift. Falls back to the original prompt."""
+    try:
+        revised = providers.chat(REVISE_SYS, f"Prompt: {prompt}\nProblem: {reason}").strip()
+        return revised[:500] or prompt
+    except Exception:  # noqa: BLE001 - never let a revision failure abort the render
+        return prompt
+
+
+EDITOR_SYS = (
+    "You are an editor naming a short-drama episode. Output STRICT JSON "
+    "{\"title\": \"...\", \"logline\": \"one sentence\"}. No prose."
+)
+
+
+def plan_edit(providers, script):
+    """Editor agent: episode title + logline. Falls back to defaults on bad output."""
+    try:
+        data = _extract_json(providers.chat(EDITOR_SYS, f"Premise: {script.premise}. Style: {script.style}."))
+        return {"title": (str(data.get("title") or "Untitled Episode"))[:80],
+                "logline": (str(data.get("logline") or ""))[:200]}
+    except (ValueError, KeyError, TypeError):
+        return {"title": "Untitled Episode", "logline": ""}
