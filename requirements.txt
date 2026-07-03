@@ -1,3 +1,4 @@
 dashscope
-gradio
+fastapi
+uvicorn
 pytest
