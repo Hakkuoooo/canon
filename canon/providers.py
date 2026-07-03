@@ -58,3 +58,105 @@ class FakeProviders(Providers):
     def tts(self, text: str, out_path: str) -> str:
         self.calls["tts"] += 1
         return _write_placeholder(out_path, b"fake-wav")
+
+
+def _as_uri(path: str) -> str:
+    if path.startswith(("http://", "https://", "file://")):
+        return path
+    return "file://" + os.path.abspath(path)
+
+
+def _download(url: str, out_path: str) -> str:
+    """Fetch a model-generated asset to out_path, https-only and size-capped (a model response must
+    not be able to make us fetch arbitrary schemes or unbounded data)."""
+    import urllib.request
+
+    from canon.config import MAX_DOWNLOAD_BYTES
+
+    if not url.startswith("https://"):
+        raise ValueError(f"refusing non-https asset url: {url[:48]}")
+    os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
+    with urllib.request.urlopen(url, timeout=180) as resp:  # noqa: S310 (scheme checked above)
+        data = resp.read(MAX_DOWNLOAD_BYTES + 1)
+    if len(data) > MAX_DOWNLOAD_BYTES:
+        raise ValueError(f"asset exceeds {MAX_DOWNLOAD_BYTES} bytes")
+    with open(out_path, "wb") as f:
+        f.write(data)
+    return out_path
+
+
+class DashScopeProviders(Providers):
+    """Real calls against Alibaba Model Studio (DashScope). Written from the docs; each call is marked
+    SPIKE where the exact id or response shape must be confirmed once a key exists. Not exercised by
+    tests (no key) — validate with canon/spikes/spike_providers.py, then correct any model id via env."""
+
+    def __init__(self, api_key=None):
+        import dashscope
+
+        from canon import config
+
+        self._ds = dashscope
+        dashscope.api_key = api_key or config.DASHSCOPE_API_KEY
+        if not dashscope.api_key:
+            raise RuntimeError("DASHSCOPE_API_KEY is not set")
+
+    def chat(self, system: str, user: str) -> str:
+        from canon import config
+
+        r = self._ds.Generation.call(
+            model=config.CHAT_MODEL,
+            messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
+            result_format="message",
+        )
+        return r["output"]["choices"][0]["message"]["content"]
+
+    def gen_image(self, prompt, seed, ref_image, out_path):
+        from canon import config
+
+        # SPIKE: confirm the text-to-image model id and whether ref_image conditioning is supported.
+        rsp = self._ds.ImageSynthesis.call(model=config.IMAGE_MODEL, prompt=prompt, n=1, seed=seed)
+        return _download(rsp.output.results[0].url, out_path)
+
+    def img2video(self, image_path, motion, out_path):
+        from canon import config
+
+        # SPIKE: assumes an image-to-video model. If only text-to-video (HappyHorse T2V) is available,
+        # switch to a t2v call using the shot prompt (thread the prompt into this method).
+        rsp = self._ds.VideoSynthesis.call(
+            model=config.VIDEO_MODEL, img_url=_as_uri(image_path), prompt=motion
+        )
+        return _download(rsp.output.video_url, out_path)
+
+    def vl_check(self, image_path, expectation):
+        from canon import config
+
+        r = self._ds.MultiModalConversation.call(
+            model=config.VL_MODEL,
+            messages=[{"role": "user", "content": [
+                {"image": _as_uri(image_path)},
+                {"text": f"Does this frame match: '{expectation}'? Reply 'yes' or 'no' and one short reason."},
+            ]}],
+        )
+        content = r["output"]["choices"][0]["message"]["content"]
+        text = content if isinstance(content, str) else " ".join(str(p.get("text", "")) for p in content)
+        return {"ok": text.strip().lower().startswith("yes"), "reason": text.strip()}
+
+    def tts(self, text, out_path):
+        from canon import config
+        from dashscope.audio.tts_v2 import SpeechSynthesizer
+
+        audio = SpeechSynthesizer(model=config.TTS_MODEL, voice="loongstella").call(text)
+        with open(out_path, "wb") as f:
+            f.write(audio)
+        return out_path
+
+
+def get_providers():
+    """DashScopeProviders when DASHSCOPE_API_KEY is set (real), else LocalMediaProviders (offline)."""
+    from canon import config
+
+    if config.DASHSCOPE_API_KEY:
+        return DashScopeProviders()
+    from canon.local_media import LocalMediaProviders
+
+    return LocalMediaProviders()
