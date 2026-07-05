@@ -99,6 +99,8 @@ class DashScopeProviders(Providers):
         dashscope.api_key = api_key or config.DASHSCOPE_API_KEY
         if not dashscope.api_key:
             raise RuntimeError("DASHSCOPE_API_KEY is not set")
+        dashscope.base_http_api_url = config.DASHSCOPE_BASE_URL  # International, not the China default
+        dashscope.base_websocket_api_url = config.DASHSCOPE_WS_URL
 
     def chat(self, system: str, user: str) -> str:
         from canon import config
