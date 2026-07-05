@@ -7,11 +7,11 @@ export async function createSeries() {
   return (await r.json()).series_id
 }
 
-export async function generateEpisode(seriesId, premise, style) {
+export async function generateEpisode(seriesId, premise, style, shots) {
   const r = await fetch(`${BASE}/api/series/${seriesId}/episodes`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ premise, style }),
+    body: JSON.stringify({ premise, style, shots }),
   })
   if (!r.ok) throw new Error(`Generation failed (${r.status})`)
   const data = await r.json()

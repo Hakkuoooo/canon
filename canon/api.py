@@ -38,6 +38,7 @@ def _characters(bible):
 class EpisodeReq(BaseModel):
     premise: str
     style: str | None = None
+    shots: int | None = None
 
 
 @app.get("/api/health")
@@ -58,7 +59,8 @@ def create_episode(series_id: str, req: EpisodeReq):
     os.makedirs(d, exist_ok=True)
     bible = Bible(d).load()
     premise = req.premise if not req.style else f"{req.premise}\n\nVisual style: {req.style}."
-    out = render_episode(premise, get_providers(), d, bible)
+    max_shots = max(1, min(12, req.shots)) if req.shots is not None else None  # clamp: bound cost
+    out = render_episode(premise, get_providers(), d, bible, max_shots)
     n = int(re.search(r"episode(\d+)\.mp4$", out).group(1))
     meta = {}
     meta_path = os.path.join(d, f"episode{n}.json")

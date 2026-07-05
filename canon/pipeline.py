@@ -60,12 +60,12 @@ def establish_refs(bible, providers, series_dir):
     return bible
 
 
-def render_episode(premise, providers, series_dir, bible):
+def render_episode(premise, providers, series_dir, bible, max_shots=None):
     """Full episode: Writer -> seed the Bible (episode 1 only) -> canonical refs -> render each shot
     through the QC loop -> stitch. Episodes after the first reuse the existing Bible unchanged, which
-    is what keeps characters consistent across episodes."""
+    is what keeps characters consistent across episodes. `max_shots` sets the episode length."""
     known = {n: c.descriptor for n, c in bible.characters.items()} or None  # ep2+: reuse the cast
-    script, chars = write_script(providers, premise, known)
+    script, chars = write_script(providers, premise, known, max_shots)
     if not bible.characters:  # episode 1 seeds the canon; later episodes reuse it
         bible.style = script.style
         for c in chars:

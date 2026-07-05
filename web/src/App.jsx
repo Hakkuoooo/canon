@@ -28,7 +28,7 @@ export default function App() {
   const [status, setStatus] = useState('idle') // idle | running | done | error
   const [error, setError] = useState('')
 
-  async function onGenerate(premise, style) {
+  async function onGenerate(premise, style, shots) {
     setStatus('running')
     setError('')
     try {
@@ -37,7 +37,7 @@ export default function App() {
         sid = await createSeries()
         setSeriesId(sid)
       }
-      const ep = await generateEpisode(sid, premise, style)
+      const ep = await generateEpisode(sid, premise, style, shots)
       setEpisodes((prev) => [...prev, ep])
       setStatus('done')
     } catch (e) {

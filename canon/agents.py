@@ -15,9 +15,10 @@ WRITER_SYS = (
 )
 
 
-def parse_script(raw: str, premise: str):
+def parse_script(raw: str, premise: str, max_shots=None):
     """Extract the JSON object from a writer reply (tolerating surrounding prose/fences) and build
     a Script plus its CharacterSheets. Raises ValueError with a clear message on malformed output."""
+    cap = max_shots or MAX_SHOTS
     start, end = raw.find("{"), raw.rfind("}")
     if start == -1 or end <= start:
         raise ValueError("writer returned no JSON object")
@@ -39,7 +40,7 @@ def parse_script(raw: str, premise: str):
                 action=str(s["action"]),
                 dialogue=str(s.get("dialogue", "")),
             )
-            for i, s in enumerate(data["shots"][:MAX_SHOTS])  # cap bounds cost on runaway output
+            for i, s in enumerate(data["shots"][:cap])  # cap bounds cost / length
         ]
     except (KeyError, TypeError, ValueError) as e:
         raise ValueError(f"writer JSON missing/invalid fields: {e}") from e
@@ -47,17 +48,18 @@ def parse_script(raw: str, premise: str):
     return Script(premise=premise, style=str(data.get("style", DEFAULT_STYLE)), shots=shots), chars
 
 
-def write_script(providers, premise: str, known=None):
-    """Run the Writer agent over the chat() boundary and parse its reply. For a later episode,
-    pass `known` (name -> descriptor) so the Writer reuses the existing cast instead of inventing one."""
-    user = premise
+def write_script(providers, premise: str, known=None, max_shots=None):
+    """Run the Writer agent over the chat() boundary and parse its reply. `max_shots` sets the
+    episode length; `known` (name -> descriptor) makes a later episode reuse the existing cast."""
+    cap = max_shots or MAX_SHOTS
+    parts = [premise, f"Write exactly {cap} shots."]
     if known:
         roster = "; ".join(f"{n}: {d}" for n, d in known.items())
-        user = (
-            f"{premise}\n\nThis is a later episode of an existing series. REUSE these exact "
-            f"characters (same names and looks), do not invent new ones: {roster}"
+        parts.append(
+            "This is a later episode of an existing series. REUSE these exact characters "
+            f"(same names and looks), do not invent new ones: {roster}"
         )
-    return parse_script(providers.chat(WRITER_SYS, user), premise)
+    return parse_script(providers.chat(WRITER_SYS, "\n\n".join(parts)), premise, cap)
 
 
 def _extract_json(raw):

@@ -127,3 +127,24 @@ def test_revise_prompt_returns_corrected_text():
     p = FakeProviders(chat_reply="flat 2D anime, red jacket, corrected lighting")
     revised = revise_prompt(p, "flat 2D anime, red jacket", "jacket too dark")
     assert "corrected" in revised
+
+
+def test_parse_script_respects_max_shots_param():
+    data = {
+        "style": "s",
+        "characters": [{"name": "A", "descriptor": "d", "seed": 1}],
+        "shots": [{"character": "A", "setting": "x", "action": f"a{i}"} for i in range(10)],
+    }
+    script, _ = parse_script(json.dumps(data), "p", max_shots=3)
+    assert len(script.shots) == 3  # user-chosen length caps the shots
+
+
+def test_write_script_requests_shot_count():
+    class Recording(FakeProviders):
+        def chat(self, system, user):
+            self.last_user = user
+            return super().chat(system, user)
+
+    p = Recording(chat_reply=json.dumps(GOOD))
+    write_script(p, "premise", max_shots=4)
+    assert "exactly 4 shots" in p.last_user.lower()

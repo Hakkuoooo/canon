@@ -192,3 +192,29 @@ def test_render_episode_writes_editor_title(tmp_path, monkeypatch):
     render_episode("p", FakeProviders(chat_reply=reply), str(tmp_path), Bible(str(tmp_path)))
     meta = json.load(open(os.path.join(str(tmp_path), "episode1.json")))
     assert meta["title"] == "The Vault"
+
+
+def test_render_episode_respects_max_shots(tmp_path, monkeypatch):
+    import re as _re
+
+    class CountingWriter(FakeProviders):
+        def chat(self, system, user):
+            m = _re.search(r"exactly (\d+) shots", user)
+            n = int(m.group(1)) if m else 1
+            return json.dumps({
+                "style": "anime",
+                "characters": [{"name": "Mara", "descriptor": "d", "seed": 1}],
+                "shots": [{"character": "Mara", "setting": "s", "action": f"a{i}"} for i in range(n)],
+            })
+
+    seen = {}
+
+    def rec(clips, out):
+        seen["n"] = len(clips)
+        with open(out, "wb") as f:
+            f.write(b"e")
+        return out
+
+    monkeypatch.setattr(pipeline_mod, "concat", rec)
+    render_episode("p", CountingWriter(), str(tmp_path), Bible(str(tmp_path)), max_shots=4)
+    assert seen["n"] == 4  # the chosen length flows Writer -> parse -> render -> stitch

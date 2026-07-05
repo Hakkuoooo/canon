@@ -1,16 +1,13 @@
 """Offline provider that makes real (tiny) placeholder media with ffmpeg, so the whole pipeline runs
 end-to-end with no API key and no credits. Used for local dev, tests, and a fallback demo. There is
-no LLM offline, so chat() returns a fixed minimal script; prefer DashScopeProviders when a key exists."""
+no LLM offline, so chat() returns a fixed cast but honors the requested shot count so episode length
+still matches the user's choice. Prefer DashScopeProviders when a key exists."""
+import json
 import os
+import re
 import subprocess
 
 from canon.providers import Providers
-
-_OFFLINE_SCRIPT = (
-    '{"style": "flat 2D anime", '
-    '"characters": [{"name": "Mara", "descriptor": "crimson field jacket, cropped black hair", "seed": 40719}], '
-    '"shots": [{"character": "Mara", "setting": "a vault", "action": "forces the lock", "dialogue": "It still opens."}]}'
-)
 
 
 def _ff(args):
@@ -19,7 +16,20 @@ def _ff(args):
 
 class LocalMediaProviders(Providers):
     def chat(self, system, user):
-        return _OFFLINE_SCRIPT  # no LLM offline; returns a parseable minimal script
+        # No LLM offline: fixed cast, but honor "Write exactly N shots" so length matches the choice.
+        m = re.search(r"exactly (\d+) shots", user)
+        n = max(1, int(m.group(1))) if m else 1
+        shots = [
+            {"character": "Mara", "setting": f"scene {i + 1}", "action": f"beat {i + 1}", "dialogue": ""}
+            for i in range(n)
+        ]
+        return json.dumps({
+            "style": "flat 2D anime",
+            "characters": [
+                {"name": "Mara", "descriptor": "crimson field jacket, cropped black hair", "seed": 40719}
+            ],
+            "shots": shots,
+        })
 
     def gen_image(self, prompt, seed, ref_image, out_path):
         os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
