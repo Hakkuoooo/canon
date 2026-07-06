@@ -10,11 +10,11 @@ DASHSCOPE_WS_URL = os.environ.get("CANON_DASHSCOPE_WS_URL", "wss://dashscope-int
 
 # Model IDs observed in Model Studio (US Virginia). Overridable by env so the spike can correct any
 # of them without a code change. SPIKE = confirm the exact callable id when the key exists.
-CHAT_MODEL = os.environ.get("CANON_CHAT_MODEL", "qwen-plus")      # verified callable id (Generation.call)
-VL_MODEL = os.environ.get("CANON_VL_MODEL", "qwen-vl-plus")       # canonical vision model for the QC check
-IMAGE_MODEL = os.environ.get("CANON_IMAGE_MODEL", "wan2.2-t2i-flash")   # SPIKE: text-to-image id
-VIDEO_MODEL = os.environ.get("CANON_VIDEO_MODEL", "happyhorse-1.0-t2v")  # SPIKE: t2v vs i2v affects the pipeline
-TTS_MODEL = os.environ.get("CANON_TTS_MODEL", "cosyvoice-v2")     # SPIKE: speech-synthesis id
+CHAT_MODEL = os.environ.get("CANON_CHAT_MODEL", "qwen-plus")      # works; qwen3.7-plus needs the compat endpoint (todo)
+VL_MODEL = os.environ.get("CANON_VL_MODEL", "qwen3-vl-plus")      # current vision model
+IMAGE_MODEL = os.environ.get("CANON_IMAGE_MODEL", "wan2.6-t2i")   # current, ~$0.03/image
+VIDEO_MODEL = os.environ.get("CANON_VIDEO_MODEL", "wan2.6-i2v-flash")  # current image-to-video, ~$0.05/sec (was pricier happyhorse)
+TTS_MODEL = os.environ.get("CANON_TTS_MODEL", "cosyvoice-v3-plus")     # current TTS
 
 MAX_REGEN = 1
 MAX_SHOTS = int(os.environ.get("CANON_MAX_SHOTS", "6"))  # cap; lower it to limit cost while testing
