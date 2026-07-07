@@ -26,6 +26,16 @@ def test_create_series_episode_and_fetch_video(tmp_path, monkeypatch):
     assert bible["characters"]
 
 
+def test_progress_endpoint_idle_then_done(tmp_path, monkeypatch):
+    monkeypatch.setattr(api, "DATA_ROOT", str(tmp_path))
+    sid = client.post("/api/series").json()["series_id"]
+    assert client.get(f"/api/series/{sid}/progress").json()["stage"] == "idle"
+
+    client.post(f"/api/series/{sid}/episodes", json={"premise": "p", "shots": 1})
+    done = client.get(f"/api/series/{sid}/progress").json()
+    assert done["stage"] == "done" and done["episode"] == 1
+
+
 def test_invalid_series_id_is_rejected(tmp_path, monkeypatch):
     monkeypatch.setattr(api, "DATA_ROOT", str(tmp_path))
     r = client.get("/api/series/..%2F..%2Fetc/bible")  # attempted path traversal

@@ -3,6 +3,7 @@ series_id is validated as a strict slug before it ever touches the filesystem â€
 path-traversal boundary the Bible module deferred to the API. Generation is synchronous here
 (fine offline and for a pre-generated demo); a job queue is the scale answer, out of scope."""
 import json
+import logging
 import os
 import re
 import uuid
@@ -13,7 +14,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from canon.bible import Bible
-from canon.pipeline import render_episode
+from canon.pipeline import _report, render_episode
 from canon.providers import get_providers
 
 DATA_ROOT = os.path.join(os.path.dirname(__file__), "data", "series")
@@ -60,7 +61,12 @@ def create_episode(series_id: str, req: EpisodeReq):
     bible = Bible(d).load()
     premise = req.premise if not req.style else f"{req.premise}\n\nVisual style: {req.style}."
     max_shots = max(1, min(12, req.shots)) if req.shots is not None else None  # clamp: bound cost
-    out = render_episode(premise, get_providers(), d, bible, max_shots)
+    try:
+        out = render_episode(premise, get_providers(), d, bible, max_shots)
+    except Exception:
+        logging.exception("episode generation failed for series %s", series_id)
+        _report(d, stage="error")  # so the progress poller stops narrating a dead run
+        raise HTTPException(status_code=500, detail="generation failed on the engine; check the server logs")
     n = int(re.search(r"episode(\d+)\.mp4$", out).group(1))
     meta = {}
     meta_path = os.path.join(d, f"episode{n}.json")
@@ -83,6 +89,17 @@ def get_video(series_id: str, n: int):
     if not os.path.exists(path):
         raise HTTPException(status_code=404, detail="episode not found")
     return FileResponse(path, media_type="video/mp4")
+
+
+@app.get("/api/series/{series_id}/progress")
+def get_progress(series_id: str):
+    """Live pipeline stage, polled by the UI during a render. Idle when nothing has run yet."""
+    path = os.path.join(_series_dir(series_id), "progress.json")
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {"stage": "idle"}
 
 
 @app.get("/api/series/{series_id}/bible")

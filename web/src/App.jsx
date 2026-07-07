@@ -1,11 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Circle } from 'lucide-react'
 import Header from './components/Header.jsx'
 import Composer from './components/Composer.jsx'
 import PipelinePanel from './components/PipelinePanel.jsx'
 import EpisodeViewer from './components/EpisodeViewer.jsx'
 import CharacterBible from './components/CharacterBible.jsx'
-import { createSeries, generateEpisode } from './api.js'
+import { createSeries, generateEpisode, getProgress } from './api.js'
 
 function Footer({ status }) {
   const online = status !== 'error'
@@ -27,10 +27,34 @@ export default function App() {
   const [episodes, setEpisodes] = useState([]) // [{ episode, video_url, characters, style }]
   const [status, setStatus] = useState('idle') // idle | running | done | error
   const [error, setError] = useState('')
+  const [progress, setProgress] = useState(null) // live stage from /progress
+  const [elapsed, setElapsed] = useState(0) // seconds since generate was pressed
+
+  // While a render runs, poll the engine's honest progress and keep a visible clock going,
+  // so a multi-minute generation never looks frozen.
+  useEffect(() => {
+    if (status !== 'running' || !seriesId) return
+    const t0 = Date.now()
+    const clock = setInterval(() => setElapsed(Math.floor((Date.now() - t0) / 1000)), 1000)
+    const poll = setInterval(async () => {
+      try {
+        const p = await getProgress(seriesId)
+        if (p?.stage && p.stage !== 'idle') setProgress(p)
+      } catch {
+        /* keep the last known stage; the POST itself reports failure */
+      }
+    }, 1000)
+    return () => {
+      clearInterval(clock)
+      clearInterval(poll)
+    }
+  }, [status, seriesId])
 
   async function onGenerate(premise, style, shots) {
     setStatus('running')
     setError('')
+    setElapsed(0)
+    setProgress({ stage: 'writer' }) // optimistic: narrate immediately, the poll corrects it
     try {
       let sid = seriesId
       if (!sid) {
@@ -57,12 +81,12 @@ export default function App() {
             <Composer onGenerate={onGenerate} status={status} />
           </div>
           <div className="reveal lg:col-span-5" style={{ animationDelay: '180ms' }}>
-            <PipelinePanel status={status} error={error} />
+            <PipelinePanel status={status} error={error} progress={progress} elapsed={elapsed} />
           </div>
         </section>
 
         <section className="reveal pb-10" style={{ animationDelay: '260ms' }}>
-          <EpisodeViewer episodes={episodes} />
+          <EpisodeViewer episodes={episodes} status={status} progress={progress} />
         </section>
 
         <section className="reveal pb-20" style={{ animationDelay: '340ms' }}>

@@ -194,6 +194,44 @@ def test_render_episode_writes_editor_title(tmp_path, monkeypatch):
     assert meta["title"] == "The Vault"
 
 
+# ---- progress reporting (long-wait UX: the API polls progress.json during a render) ----
+
+def test_report_writes_progress_json(tmp_path):
+    pipeline_mod._report(str(tmp_path), stage="shot", shot=2, total=6, phase="animate")
+    data = json.load(open(os.path.join(str(tmp_path), "progress.json")))
+    assert data == {"stage": "shot", "shot": 2, "total": 6, "phase": "animate"}
+
+
+def test_render_episode_reports_progress_stages(tmp_path, monkeypatch):
+    _patch_concat(monkeypatch)
+    events = []
+    monkeypatch.setattr(pipeline_mod, "_report", lambda series_dir, **kw: events.append(kw))
+    render_episode("p", FakeProviders(chat_reply=EP1), str(tmp_path), Bible(str(tmp_path)))
+
+    stages = [e["stage"] for e in events]
+    assert stages[0] == "writer"
+    assert "casting" in stages and "framing" in stages and "title" in stages
+    assert "stitch" in stages and stages[-1] == "done"
+    shot_events = [e for e in events if e["stage"] == "shot"]
+    assert {(e["shot"], e["total"]) for e in shot_events} == {(1, 2), (2, 2)}
+    assert [e["phase"] for e in shot_events if e["shot"] == 1] == ["render", "check", "animate"]
+
+
+def test_progress_reports_drift_reroll(tmp_path, monkeypatch):
+    _patch_concat(monkeypatch)
+    events = []
+    monkeypatch.setattr(pipeline_mod, "_report", lambda series_dir, **kw: events.append(kw))
+    one_shot = json.dumps({
+        "style": "anime",
+        "characters": [{"name": "Mara", "descriptor": "d", "seed": 1}],
+        "shots": [{"character": "Mara", "setting": "s", "action": "a"}],
+    })
+    p = FakeProviders(chat_reply=one_shot, vl_results=[{"ok": False, "reason": "drift"}, {"ok": True}])
+    render_episode("p", p, str(tmp_path), Bible(str(tmp_path)))
+    phases = [e.get("phase") for e in events if e["stage"] == "shot"]
+    assert phases == ["render", "check", "rerender", "check", "animate"]  # the QC loop is visible
+
+
 def test_render_episode_respects_max_shots(tmp_path, monkeypatch):
     import re as _re
 

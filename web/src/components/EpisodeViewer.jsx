@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Lock, Clapperboard } from 'lucide-react'
 
-export default function EpisodeViewer({ episodes = [] }) {
+export default function EpisodeViewer({ episodes = [], status = 'idle', progress = null }) {
+  const running = status === 'running'
   const [active, setActive] = useState(0)
   useEffect(() => {
     if (episodes.length) setActive(episodes.length - 1) // jump to the newest episode
@@ -50,10 +51,24 @@ export default function EpisodeViewer({ episodes = [] }) {
             <video key={current.video_url} src={current.video_url} controls className="h-full w-full object-cover" />
           ) : (
             <div className="absolute inset-0 grid place-items-center px-6 text-center">
-              <div className="flex flex-col items-center gap-3 text-cream/60">
-                <Clapperboard className="h-8 w-8" strokeWidth={1.25} />
-                <span className="text-[13px]">Your episode screens here once the agents finish.</span>
-              </div>
+              {running ? (
+                <div className="flex flex-col items-center gap-3 text-cream/70">
+                  <span className="breathe h-2.5 w-2.5 rounded-full bg-sage" />
+                  <span className="text-[13px]">
+                    {progress?.stage === 'shot'
+                      ? `Rendering shot ${progress.shot} of ${progress.total}`
+                      : 'The agents are at work'}
+                  </span>
+                  <span className="text-[12px] text-cream/45">
+                    Real generation takes a few minutes per shot. This room fills the moment it is done.
+                  </span>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-3 text-cream/60">
+                  <Clapperboard className="h-8 w-8" strokeWidth={1.25} />
+                  <span className="text-[13px]">Your episode screens here once the agents finish.</span>
+                </div>
+              )}
             </div>
           )}
           {current && (

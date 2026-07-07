@@ -67,9 +67,23 @@
   animation: breathe 2.4s ease-in-out infinite;
 }
 
+/* indeterminate progress: a soft sage band drifting along a hairline track */
+@keyframes drift {
+  from {
+    transform: translateX(-110%);
+  }
+  to {
+    transform: translateX(410%);
+  }
+}
+.drift {
+  animation: drift 2s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .reveal,
-  .breathe {
+  .breathe,
+  .drift {
     animation: none;
   }
 }

@@ -7,6 +7,12 @@ export async function createSeries() {
   return (await r.json()).series_id
 }
 
+export async function getProgress(seriesId) {
+  const r = await fetch(`${BASE}/api/series/${seriesId}/progress`)
+  if (!r.ok) throw new Error('progress unavailable')
+  return r.json()
+}
+
 export async function generateEpisode(seriesId, premise, style, shots) {
   const r = await fetch(`${BASE}/api/series/${seriesId}/episodes`, {
     method: 'POST',
