@@ -8,13 +8,13 @@ DASHSCOPE_API_KEY = os.environ.get("DASHSCOPE_API_KEY", "")
 DASHSCOPE_BASE_URL = os.environ.get("CANON_DASHSCOPE_BASE_URL", "https://dashscope-intl.aliyuncs.com/api/v1")
 DASHSCOPE_WS_URL = os.environ.get("CANON_DASHSCOPE_WS_URL", "wss://dashscope-intl.aliyuncs.com/api-ws/v1/inference")
 
-# Model IDs observed in Model Studio (US Virginia). Overridable by env so the spike can correct any
-# of them without a code change. SPIKE = confirm the exact callable id when the key exists.
-CHAT_MODEL = os.environ.get("CANON_CHAT_MODEL", "qwen-plus")      # works; qwen3.7-plus needs the compat endpoint (todo)
-VL_MODEL = os.environ.get("CANON_VL_MODEL", "qwen3-vl-plus")      # current vision model
-IMAGE_MODEL = os.environ.get("CANON_IMAGE_MODEL", "wan2.6-t2i")   # current, ~$0.03/image
-VIDEO_MODEL = os.environ.get("CANON_VIDEO_MODEL", "wan2.6-i2v-flash")  # current image-to-video, ~$0.05/sec (was pricier happyhorse)
-TTS_MODEL = os.environ.get("CANON_TTS_MODEL", "cosyvoice-v3-plus")     # current TTS
+# Model IDs verified against dashscope-intl by spike + probe on 7 Jul 2026 (see canon/spikes/).
+# Overridable by env so a future id change needs no code edit.
+CHAT_MODEL = os.environ.get("CANON_CHAT_MODEL", "qwen-plus")      # verified
+VL_MODEL = os.environ.get("CANON_VL_MODEL", "qwen3-vl-plus")      # verified
+IMAGE_MODEL = os.environ.get("CANON_IMAGE_MODEL", "wan2.5-t2i-preview")  # verified; wan2.6-t2i* ids are NOT callable on intl
+VIDEO_MODEL = os.environ.get("CANON_VIDEO_MODEL", "wan2.6-i2v-flash")    # verified, 5s clips, ~$0.05/sec
+TTS_MODEL = os.environ.get("CANON_TTS_MODEL", "cosyvoice-v3-plus")       # unverified; TTS not wired into episodes
 
 MAX_REGEN = 1
 MAX_SHOTS = int(os.environ.get("CANON_MAX_SHOTS", "6"))  # cap; lower it to limit cost while testing

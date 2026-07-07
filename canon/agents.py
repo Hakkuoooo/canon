@@ -11,7 +11,10 @@ WRITER_SYS = (
     '"characters" (list of {"name": string, "descriptor": short fixed visual description, "seed": integer}), '
     f'"shots" (list of {{"character": name or null, "setting": string, "action": string, '
     f'"dialogue": string}}, max {MAX_SHOTS}). '
-    "Seeds are distinct integers. Keep descriptors concrete so the look stays consistent."
+    "Seeds are distinct integers. The descriptor is a 15-25 word head-to-toe spec that never changes: "
+    "hair, eye colour, face, each garment with colour and construction detail (collar, zip, belt), "
+    "trousers, shoes. Concrete nouns only; the same descriptor is reused to redraw the character in "
+    "every shot, so vague wording causes visual drift."
 )
 
 
