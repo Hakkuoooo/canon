@@ -194,6 +194,31 @@ def test_render_episode_writes_editor_title(tmp_path, monkeypatch):
     assert meta["title"] == "The Vault"
 
 
+# ---- story legibility: setting anchors the frame, group shots stay consistent ----
+
+def test_shot_prompt_includes_setting(tmp_path):
+    p = FakeProviders()
+    shot = render_shot(Shot(0, "Mara", "the vault antechamber", "runs"), _bible(tmp_path), p, str(tmp_path))
+    assert "the vault antechamber" in shot.prompt
+
+
+def test_group_shot_appends_named_cast_descriptors(tmp_path):
+    b = _bible(tmp_path)
+    b.upsert(CharacterSheet("Iven", "ash overcoat, silver hair", 7, ref_image="r.png"))
+    p = FakeProviders()
+    # Mara is the primary; Iven is named in the action -> his locked look joins the prompt
+    shot = render_shot(Shot(0, "Mara", "vault", "argues with Iven over the ledger"), b, p, str(tmp_path))
+    assert "red jacket" in shot.prompt and "ash overcoat" in shot.prompt
+
+
+def test_episode_json_persists_script_shots(tmp_path, monkeypatch):
+    _patch_concat(monkeypatch)
+    render_episode("p", FakeProviders(chat_reply=EP1), str(tmp_path), Bible(str(tmp_path)))
+    meta = json.load(open(os.path.join(str(tmp_path), "episode1.json")))
+    assert [s["character"] for s in meta["shots"]] == ["Mara", "Iven"]
+    assert meta["shots"][0]["dialogue"] == "It opens."
+
+
 # ---- progress reporting (long-wait UX: the API polls progress.json during a render) ----
 
 def test_report_writes_progress_json(tmp_path):

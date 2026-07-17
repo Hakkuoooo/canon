@@ -59,7 +59,10 @@ class Bible:
     def upsert(self, sheet: CharacterSheet) -> None:
         self.characters[sheet.name] = sheet
 
-    def prompt_for(self, character_name: str, action: str) -> str:
+    def prompt_for(self, character_name: str, action: str, setting: str = "") -> str:
         # KeyError if unknown: callers only ask for characters the writer already put in the bible.
+        # `setting` anchors the frame to the scripted place; without it the image model reinvents
+        # the location on every shot and the episode stops reading as one story.
         c = self.characters[character_name]
-        return f"{self.style}, {c.descriptor}, {action}"
+        where = f"in {setting}, " if setting else ""
+        return f"{self.style}, {c.descriptor}, {where}{action}"

@@ -21,7 +21,9 @@ def _concat_line(path):
 
 
 def concat(clip_paths, out_path):
-    """Stitch clips into one file (stream copy, no re-encode)."""
+    """Stitch clips into one file. Re-encodes: clips arrive from different encoders (Wan
+    downloads vs caption re-encodes), and stream-copy across mixed encoder params produces
+    corrupt output. Episodes are short; the re-encode cost is irrelevant."""
     if not clip_paths:
         raise ValueError("no clips to concat")
     work = os.path.dirname(os.path.abspath(out_path))
@@ -29,7 +31,8 @@ def concat(clip_paths, out_path):
     with open(listfile, "w", encoding="utf-8") as f:
         f.writelines(_concat_line(c) for c in clip_paths)
     try:
-        _run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", listfile, "-c", "copy", out_path])
+        _run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", listfile,
+              "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", out_path])
     finally:
         os.remove(listfile)
     return out_path
@@ -62,6 +65,64 @@ def add_subtitles(video, srt_path, out_path):
         ["ffmpeg", "-y", "-i", os.path.abspath(video), "-i", os.path.abspath(srt_path),
          "-map", "0", "-map", "1", "-c", "copy", "-c:s", "mov_text", os.path.abspath(out_path)]
     )
+    return out_path
+
+
+CAPTION_FONT = os.environ.get("CANON_CAPTION_FONT", "/System/Library/Fonts/Helvetica.ttc")
+
+
+def _wrap(text, width=42):
+    words, lines, cur = text.split(), [], ""
+    for w in words:
+        if cur and len(cur) + 1 + len(w) > width:
+            lines.append(cur)
+            cur = w
+        else:
+            cur = f"{cur} {w}".strip()
+    lines.append(cur)
+    return "\n".join(lines[:3])
+
+
+def _caption_png(text, path, design_width=1440):
+    """Render the caption as a transparent PNG pill (Pillow). Text is drawn, never parsed,
+    so hostile dialogue is just pixels. Sized for our 1440-wide episodes.
+    ponytail: fixed design width; scale against the actual video if formats ever vary."""
+    from PIL import Image, ImageDraw, ImageFont
+
+    lines = _wrap(text).split("\n")
+    size = design_width // 26
+    font = ImageFont.truetype(CAPTION_FONT, size)
+    pad, gap = int(size * 0.7), int(size * 0.3)
+    probe = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
+    boxes = [probe.textbbox((0, 0), ln, font=font) for ln in lines]
+    line_h = max(b[3] - b[1] for b in boxes)
+    box_w = max(b[2] - b[0] for b in boxes) + pad * 2
+    box_h = line_h * len(lines) + gap * (len(lines) - 1) + pad * 2
+    img = Image.new("RGBA", (box_w, box_h), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    d.rounded_rectangle([0, 0, box_w - 1, box_h - 1], radius=size // 2, fill=(0, 0, 0, 150))
+    y = pad
+    for ln, b in zip(lines, boxes):
+        d.text(((box_w - (b[2] - b[0])) // 2 - b[0], y - b[1]), ln, font=font, fill=(255, 255, 255, 255))
+        y += line_h + gap
+    img.save(path)
+    return path
+
+
+def burn_caption(video, text, out_path):
+    """Overlay a dialogue caption onto the video (caption PNG + ffmpeg overlay; works on
+    slim ffmpeg builds that lack drawtext). Blank text returns the source untouched."""
+    text = (text or "").strip()
+    if not text:
+        return video
+    png = os.path.abspath(out_path) + ".caption.png"
+    _caption_png(text, png)
+    try:
+        _run(["ffmpeg", "-y", "-i", os.path.abspath(video), "-i", png,
+              "-filter_complex", "overlay=(W-w)/2:H-h-H/14", "-c:a", "copy",
+              os.path.abspath(out_path)])
+    finally:
+        os.remove(png)
     return out_path
 
 

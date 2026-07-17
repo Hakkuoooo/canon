@@ -8,7 +8,7 @@ import re
 
 from canon.agents import direct_shots, plan_edit, revise_prompt, write_script
 from canon.config import MAX_REGEN
-from canon.edit import concat
+from canon.edit import burn_caption, concat
 
 
 def _report(series_dir, **payload):
@@ -28,13 +28,19 @@ def render_shot(shot, bible, providers, work_dir, max_regen=MAX_REGEN, framing="
     report = report or (lambda **kw: None)  # progress hook; no-op for direct callers/tests
     if shot.character and shot.character in bible.characters:
         c = bible.characters[shot.character]
-        base = bible.prompt_for(shot.character, shot.action)
+        base = bible.prompt_for(shot.character, shot.action, shot.setting)
         seed, ref = c.seed, c.ref_image
     else:
         # narration/establishing shot, or a character the writer named but never defined:
         # degrade to a style+action prompt rather than crashing mid-episode.
-        base = f"{bible.style}, {shot.action}"
+        where = f"in {shot.setting}, " if shot.setting else ""
+        base = f"{bible.style}, {where}{shot.action}"
         seed, ref = 0, None
+    # Group shots: any other cast member named in the action brings their locked look along,
+    # otherwise a two-character scene renders the second character from imagination.
+    for name, other in bible.characters.items():
+        if name != shot.character and name in shot.action:
+            base += f", {other.descriptor}"
     shot.prompt = f"{base}, {framing}" if framing else base  # Cinematographer's framing
 
     # Filenames key off the integer shot index, never the model-supplied character name,
@@ -109,10 +115,20 @@ def render_episode(premise, providers, series_dir, bible, max_shots=None):
         def shot_report(_i=i, **kw):  # default-arg bind: each shot reports its own number
             report(stage="shot", shot=_i + 1, total=total, **kw)
 
-        clips.append(render_shot(shot, bible, providers, work, framing=framing[i], report=shot_report).clip)
+        clip = render_shot(shot, bible, providers, work, framing=framing[i], report=shot_report).clip
+        if shot.dialogue:
+            try:  # captions carry the story; but they are garnish, never fail an episode over one
+                clip = burn_caption(clip, shot.dialogue, os.path.join(work, f"shot{shot.index}_cap.mp4"))
+            except RuntimeError:
+                pass
+        clips.append(clip)
     report(stage="stitch")
     out = concat(clips, os.path.join(series_dir, f"episode{n}.mp4"))
+    plan["shots"] = [  # persist the script: the story is data, not a side effect
+        {"character": s.character, "setting": s.setting, "action": s.action, "dialogue": s.dialogue}
+        for s in script.shots
+    ]
     with open(os.path.join(series_dir, f"episode{n}.json"), "w", encoding="utf-8") as f:
-        json.dump(plan, f)  # Editor's title/logline, read back by the API
+        json.dump(plan, f)  # Editor's title/logline + the shot list, read back by the API
     report(stage="done", episode=n)
     return out

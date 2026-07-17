@@ -94,3 +94,21 @@ def test_malicious_subtitle_text_is_data_not_command(tmp_path):
     add_subtitles(clip, srt, out)
     assert os.path.exists(out)
     assert not canary.exists()  # no shell execution: text stayed data
+
+
+def test_burn_caption_renders_text_onto_video(tmp_path):
+    from canon.edit import burn_caption
+
+    src = str(tmp_path / "src.mp4")
+    _clip(src, 1)
+    out = burn_caption(src, 'She said: "it\'s ours, 100%"', str(tmp_path / "cap.mp4"))
+    assert os.path.exists(out) and _has_stream(out, "video")
+    assert _duration(out) > 0.5
+
+
+def test_burn_caption_empty_text_returns_source(tmp_path):
+    from canon.edit import burn_caption
+
+    src = str(tmp_path / "src.mp4")
+    _clip(src, 1)
+    assert burn_caption(src, "   ", str(tmp_path / "cap.mp4")) == src

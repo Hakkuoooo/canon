@@ -14,7 +14,12 @@ WRITER_SYS = (
     "Seeds are distinct integers. The descriptor is a 15-25 word head-to-toe spec that never changes: "
     "hair, eye colour, face, each garment with colour and construction detail (collar, zip, belt), "
     "trousers, shoes. Concrete nouns only; the same descriptor is reused to redraw the character in "
-    "every shot, so vague wording causes visual drift."
+    "every shot, so vague wording causes visual drift. "
+    "The shots must play as ONE continuous scene: each action is a concrete physical moment visible "
+    "in a single frame, caused by the shot before it. Copy the setting text verbatim between shots "
+    "that happen in the same place. For a two-character moment, set character to the main one and "
+    "name the other inside the action. Dialogue is one short spoken line, under 12 words, that "
+    "advances the story; every character shot has one."
 )
 
 

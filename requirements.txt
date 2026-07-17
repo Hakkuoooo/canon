@@ -2,3 +2,4 @@ dashscope
 fastapi
 uvicorn
 pytest
+pillow
