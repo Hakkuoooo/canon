@@ -47,3 +47,13 @@ def test_episode_response_includes_script_shots(tmp_path, monkeypatch):
     sid = client.post("/api/series").json()["series_id"]
     r = client.post(f"/api/series/{sid}/episodes", json={"premise": "p", "shots": 2}).json()
     assert len(r["shots"]) == 2 and {"character", "setting", "action", "dialogue"} <= set(r["shots"][0])
+
+
+def test_list_episodes_rehydrates_series(tmp_path, monkeypatch):
+    monkeypatch.setattr(api, "DATA_ROOT", str(tmp_path))
+    sid = client.post("/api/series").json()["series_id"]
+    client.post(f"/api/series/{sid}/episodes", json={"premise": "p", "shots": 1})
+    client.post(f"/api/series/{sid}/episodes", json={"premise": "p2", "shots": 1})
+    eps = client.get(f"/api/series/{sid}/episodes").json()["episodes"]
+    assert [e["episode"] for e in eps] == [1, 2]
+    assert eps[0]["video_url"].endswith("/episodes/1/video") and eps[0]["characters"]

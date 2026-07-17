@@ -7,6 +7,13 @@ export async function createSeries() {
   return (await r.json()).series_id
 }
 
+export async function listEpisodes(seriesId) {
+  const r = await fetch(`${BASE}/api/series/${seriesId}/episodes`)
+  if (!r.ok) throw new Error('series not found')
+  const { episodes } = await r.json()
+  return episodes.map((e) => ({ ...e, video_url: `${BASE}${e.video_url}` }))
+}
+
 export async function getProgress(seriesId) {
   const r = await fetch(`${BASE}/api/series/${seriesId}/progress`)
   if (!r.ok) throw new Error('progress unavailable')

@@ -5,7 +5,7 @@ import Composer from './components/Composer.jsx'
 import PipelinePanel from './components/PipelinePanel.jsx'
 import EpisodeViewer from './components/EpisodeViewer.jsx'
 import CharacterBible from './components/CharacterBible.jsx'
-import { createSeries, generateEpisode, getProgress } from './api.js'
+import { createSeries, generateEpisode, getProgress, listEpisodes } from './api.js'
 
 function Footer({ status }) {
   const online = status !== 'error'
@@ -29,6 +29,22 @@ export default function App() {
   const [error, setError] = useState('')
   const [progress, setProgress] = useState(null) // live stage from /progress
   const [elapsed, setElapsed] = useState(0) // seconds since generate was pressed
+
+  // The URL anchors the series (?series=...), so an accidental reload rehydrates
+  // everything already rendered instead of losing the session.
+  useEffect(() => {
+    const sid = new URLSearchParams(window.location.search).get('series')
+    if (!sid) return
+    setSeriesId(sid)
+    listEpisodes(sid)
+      .then((eps) => {
+        if (eps.length) {
+          setEpisodes(eps)
+          setStatus('done')
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   // While a render runs, poll the engine's honest progress and keep a visible clock going,
   // so a multi-minute generation never looks frozen.
@@ -61,6 +77,8 @@ export default function App() {
         sid = await createSeries()
         setSeriesId(sid)
       }
+      // anchor the session in the URL so a reload can always find its way back
+      window.history.replaceState(null, '', `?series=${sid}`)
       const ep = await generateEpisode(sid, premise, style, shots)
       setEpisodes((prev) => [...prev, ep])
       setStatus('done')

@@ -2,6 +2,7 @@
 series_id is validated as a strict slug before it ever touches the filesystem — this is the
 path-traversal boundary the Bible module deferred to the API. Generation is synchronous here
 (fine offline and for a pre-generated demo); a job queue is the scale answer, out of scope."""
+import glob
 import json
 import logging
 import os
@@ -90,6 +91,31 @@ def get_video(series_id: str, n: int):
     if not os.path.exists(path):
         raise HTTPException(status_code=404, detail="episode not found")
     return FileResponse(path, media_type="video/mp4")
+
+
+@app.get("/api/series/{series_id}/episodes")
+def list_episodes(series_id: str):
+    """Everything already rendered for a series, so the UI can rehydrate after a reload."""
+    d = _series_dir(series_id)
+    bible = Bible(d).load()
+    episodes = []
+    for path in glob.glob(os.path.join(d, "episode*.mp4")):
+        n = int(re.search(r"episode(\d+)\.mp4$", path).group(1))
+        meta = {}
+        meta_path = os.path.join(d, f"episode{n}.json")
+        if os.path.exists(meta_path):
+            with open(meta_path, encoding="utf-8") as f:
+                meta = json.load(f)
+        episodes.append({
+            "episode": n,
+            "title": meta.get("title"),
+            "logline": meta.get("logline"),
+            "shots": meta.get("shots", []),
+            "video_url": f"/api/series/{series_id}/episodes/{n}/video",
+            "style": bible.style,
+            "characters": _characters(bible),
+        })
+    return {"episodes": sorted(episodes, key=lambda e: e["episode"])}
 
 
 @app.get("/api/series/{series_id}/progress")
