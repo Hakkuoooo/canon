@@ -98,7 +98,8 @@ def test_render_episode_seeds_bible_refs_and_concats(tmp_path, monkeypatch):
     assert set(bible.characters) == {"Mara", "Iven"} and bible.style == "flat 2D anime"
     for c in bible.characters.values():  # one canonical ref each, inside refs/
         assert c.ref_image and os.path.dirname(c.ref_image) == os.path.join(str(tmp_path), "refs")
-    assert len(calls["clips"]) == 2 and calls["out"] == out and os.path.exists(out)
+    assert len(calls["clips"]) == 3 and calls["out"] == out and os.path.exists(out)  # title + 2 shots
+    assert "title" in os.path.basename(calls["clips"][0])  # episode opens on the Editor's card
 
 
 def test_slug_sanitizes_hostile_names():
@@ -280,7 +281,7 @@ def test_render_episode_respects_max_shots(tmp_path, monkeypatch):
 
     monkeypatch.setattr(pipeline_mod, "concat", rec)
     render_episode("p", CountingWriter(), str(tmp_path), Bible(str(tmp_path)), max_shots=4)
-    assert seen["n"] == 4  # the chosen length flows Writer -> parse -> render -> stitch
+    assert seen["n"] == 5  # title card + the 4 chosen shots flow Writer -> parse -> render -> stitch
 
 
 def test_dialogue_reaches_video_model(tmp_path):

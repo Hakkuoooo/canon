@@ -126,6 +126,50 @@ def burn_caption(video, text, out_path):
     return out_path
 
 
+def _dims(video):
+    out = _run(["ffprobe", "-v", "error", "-select_streams", "v", "-show_entries",
+                "stream=width,height", "-of", "csv=p=0", os.path.abspath(video)]).stdout.strip()
+    w, h = out.split("\n")[0].split(",")
+    return int(w), int(h)
+
+
+def title_card(title, episode_n, out_path, ref_clip=None, seconds=2):
+    """A short opening card: bone background, episode eyebrow, the Editor's title. Sized to match
+    `ref_clip` so concat accepts it alongside the episode's shots (silent aac track included)."""
+    from PIL import Image, ImageDraw, ImageFont
+
+    try:
+        w, h = _dims(ref_clip) if ref_clip else (1440, 1440)
+    except (RuntimeError, ValueError):
+        w, h = 1440, 1440
+    img = Image.new("RGB", (w, h), (242, 238, 228))  # the studio's bone
+    d = ImageDraw.Draw(img)
+    eyebrow_font = ImageFont.truetype(CAPTION_FONT, max(12, w // 48))
+    title_font = ImageFont.truetype(CAPTION_FONT, max(16, w // 16))
+    eyebrow = f"C A N O N   ·   E P I S O D E   {episode_n}"
+    lines = _wrap(title, 26).split("\n")
+    line_h = int(title_font.size * 1.25)
+    block_h = int(eyebrow_font.size * 2.2) + line_h * len(lines)
+    y = (h - block_h) // 2
+    eb_w = d.textbbox((0, 0), eyebrow, font=eyebrow_font)[2]
+    d.text(((w - eb_w) // 2, y), eyebrow, font=eyebrow_font, fill=(116, 133, 106))  # sage
+    y += int(eyebrow_font.size * 2.2)
+    for ln in lines:
+        b = d.textbbox((0, 0), ln, font=title_font)
+        d.text(((w - (b[2] - b[0])) // 2 - b[0], y), ln, font=title_font, fill=(38, 32, 25))  # ink
+        y += line_h
+    png = os.path.abspath(out_path) + ".card.png"
+    img.save(png)
+    try:
+        _run(["ffmpeg", "-y", "-loop", "1", "-i", png, "-f", "lavfi",
+              "-i", "anullsrc=r=44100:cl=stereo", "-t", str(seconds), "-r", "30",
+              "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest",
+              os.path.abspath(out_path)])
+    finally:
+        os.remove(png)
+    return out_path
+
+
 def mux_audio(video, audio_path, out_path):
     """Overlay an audio track on the video, trimming to the shorter stream."""
     _run(

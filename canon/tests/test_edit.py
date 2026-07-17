@@ -112,3 +112,16 @@ def test_burn_caption_empty_text_returns_source(tmp_path):
     src = str(tmp_path / "src.mp4")
     _clip(src, 1)
     assert burn_caption(src, "   ", str(tmp_path / "cap.mp4")) == src
+
+
+def test_title_card_makes_clip_matching_reference_dims(tmp_path):
+    from canon.edit import title_card
+
+    ref = str(tmp_path / "ref.mp4")
+    _clip(ref, 1)  # 64x64 reference
+    out = title_card("The Vault of Unremembered Things", 1, str(tmp_path / "t.mp4"), ref_clip=ref)
+    assert os.path.exists(out) and _has_stream(out, "video") and _has_stream(out, "audio")
+    probe = subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "v", "-show_entries", "stream=width,height",
+         "-of", "csv=p=0", out], capture_output=True, text=True).stdout.strip()
+    assert probe == "64,64"  # matches the episode's clips so concat accepts it

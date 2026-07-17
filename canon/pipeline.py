@@ -8,7 +8,7 @@ import re
 
 from canon.agents import direct_shots, plan_edit, revise_prompt, write_script
 from canon.config import MAX_REGEN
-from canon.edit import burn_caption, concat
+from canon.edit import burn_caption, concat, title_card
 
 
 def _report(series_dir, **payload):
@@ -132,6 +132,10 @@ def render_episode(premise, providers, series_dir, bible, max_shots=None):
                 pass
         clips.append(clip)
     report(stage="stitch")
+    try:  # open on the Editor's title; garnish, never fail an episode over it
+        clips.insert(0, title_card(plan["title"], n, os.path.join(work, "title.mp4"), ref_clip=clips[0]))
+    except Exception:  # noqa: BLE001
+        pass
     out = concat(clips, os.path.join(series_dir, f"episode{n}.mp4"))
     plan["shots"] = [  # persist the script: the story is data, not a side effect
         {"character": s.character, "setting": s.setting, "action": s.action, "dialogue": s.dialogue}
