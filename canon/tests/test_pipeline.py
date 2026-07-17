@@ -317,3 +317,12 @@ def test_episode_seeds_and_reuses_locations(tmp_path, monkeypatch):
     assert bible.locations["vault room"] == "stone cellar, hanging bulb"
     reloaded = Bible(str(tmp_path)).load()
     assert reloaded.locations["vault room"] == "stone cellar, hanging bulb"  # ep2 inherits the room
+
+
+def test_two_hander_character_field_pulls_both_descriptors(tmp_path):
+    b = _bible(tmp_path)
+    b.upsert(CharacterSheet("Iven", "ash overcoat, silver hair", 7, ref_image="r.png"))
+    p = FakeProviders()
+    # writers emit character="Mara and Iven" for group shots; both locked looks must load
+    shot = render_shot(Shot(0, "Mara and Iven", "vault", "stand side by side"), b, p, str(tmp_path))
+    assert "red jacket" in shot.prompt and "ash overcoat" in shot.prompt

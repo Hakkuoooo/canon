@@ -39,10 +39,12 @@ def render_shot(shot, bible, providers, work_dir, max_regen=MAX_REGEN, framing="
         where = f"in {place}, " if place else ""
         base = f"{bible.style}, {where}{shot.action}"
         seed, ref = 0, None
-    # Group shots: any other cast member named in the action brings their locked look along,
-    # otherwise a two-character scene renders the second character from imagination.
+    # Group shots: any other cast member named in the action OR the character field brings
+    # their locked look along (writers produce character="Eli and Mira" for two-handers),
+    # otherwise the second character renders from imagination.
+    named_in = f"{shot.character or ''} {shot.action}"
     for name, other in bible.characters.items():
-        if name != shot.character and name in shot.action:
+        if name != shot.character and name in named_in:
             base += f", {other.descriptor}"
     shot.prompt = f"{base}, {framing}" if framing else base  # Cinematographer's framing
 
