@@ -281,3 +281,15 @@ def test_render_episode_respects_max_shots(tmp_path, monkeypatch):
     monkeypatch.setattr(pipeline_mod, "concat", rec)
     render_episode("p", CountingWriter(), str(tmp_path), Bible(str(tmp_path)), max_shots=4)
     assert seen["n"] == 4  # the chosen length flows Writer -> parse -> render -> stitch
+
+
+def test_dialogue_reaches_video_model(tmp_path):
+    p = FakeProviders()
+    render_shot(Shot(0, "Mara", "vault", "turns to face him", dialogue="You came back."), _bible(tmp_path), p, str(tmp_path))
+    assert 'speaks: "You came back."' in p.last_motion
+
+
+def test_no_dialogue_keeps_plain_motion(tmp_path):
+    p = FakeProviders()
+    render_shot(Shot(0, "Mara", "vault", "runs"), _bible(tmp_path), p, str(tmp_path))
+    assert p.last_motion == "runs"

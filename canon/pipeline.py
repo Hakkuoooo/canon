@@ -58,7 +58,10 @@ def render_shot(shot, bible, providers, work_dir, max_regen=MAX_REGEN, framing="
 
     report(phase="animate")  # image-to-video, the slow call
     clip = os.path.join(work_dir, f"shot{shot.index}.mp4")
-    shot.clip = providers.img2video(img, shot.action, clip)
+    # Wan 2.6 generates audio jointly with video: give it the spoken line so the character
+    # performs the dialogue on screen instead of the model inventing ambient murmur.
+    motion = f'{shot.action}. The character speaks: "{shot.dialogue}"' if shot.dialogue else shot.action
+    shot.clip = providers.img2video(img, motion, clip)
     return shot
 
 

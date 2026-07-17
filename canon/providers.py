@@ -49,6 +49,7 @@ class FakeProviders(Providers):
 
     def img2video(self, image_path: str, motion: str, out_path: str) -> str:
         self.calls["img2video"] += 1
+        self.last_motion = motion  # tests assert dialogue reaches the video model
         return _write_placeholder(out_path, b"fake-mp4")
 
     def vl_check(self, image_path: str, expectation: str) -> dict:
