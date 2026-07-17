@@ -29,4 +29,5 @@ With both episodes already generated: one continuous recording. Studio → speak
 - Do end on the ep2 reveal held for a few quiet seconds; it is the pitch.
 - Do record voice in one quiet room pass; re-record a sentence rather than living with a stumble.
 - Don't show the terminal, .env, or billing pages.
-- Don't claim voice/audio in episodes; they are silent by design in this build.
+- Episodes carry generated ambient audio and burned dialogue captions; let ep1's lines land
+  and let ep2 play quiet, its payoff is the smile. Don't talk over the reveal.
