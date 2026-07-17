@@ -26,14 +26,17 @@ def _report(series_dir, **payload):
 
 def render_shot(shot, bible, providers, work_dir, max_regen=MAX_REGEN, framing="", report=None):
     report = report or (lambda **kw: None)  # progress hook; no-op for direct callers/tests
+    # A setting that names a Bible location resolves to its locked descriptor, so the same
+    # place renders the same way in every shot and every episode.
+    place = bible.locations.get(shot.setting, shot.setting)
     if shot.character and shot.character in bible.characters:
         c = bible.characters[shot.character]
-        base = bible.prompt_for(shot.character, shot.action, shot.setting)
+        base = bible.prompt_for(shot.character, shot.action, place)
         seed, ref = c.seed, c.ref_image
     else:
         # narration/establishing shot, or a character the writer named but never defined:
         # degrade to a style+action prompt rather than crashing mid-episode.
-        where = f"in {shot.setting}, " if shot.setting else ""
+        where = f"in {place}, " if place else ""
         base = f"{bible.style}, {where}{shot.action}"
         seed, ref = 0, None
     # Group shots: any other cast member named in the action brings their locked look along,
@@ -96,12 +99,15 @@ def render_episode(premise, providers, series_dir, bible, max_shots=None):
 
     report(stage="writer")
     known = {n: c.descriptor for n, c in bible.characters.items()} or None  # ep2+: reuse the cast
-    script, chars = write_script(providers, premise, known, max_shots)
+    script, chars = write_script(providers, premise, known, max_shots,
+                                 known_locations=dict(bible.locations) or None)
     if not bible.characters:  # episode 1 seeds the canon; later episodes reuse it
         bible.style = script.style
         for c in chars:
             bible.upsert(c)
-        bible.save()
+    for name, desc in script.locations.items():
+        bible.locations.setdefault(name, desc)  # canon keeps the first spec; new places accrete
+    bible.save()
     establish_refs(bible, providers, series_dir, report=report)
 
     report(stage="framing")

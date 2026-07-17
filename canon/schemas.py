@@ -29,8 +29,9 @@ class Shot:
 
 @dataclass
 class Script:
-    """A single episode's plan: premise, style, and its ordered shots."""
+    """A single episode's plan: premise, style, locked locations, and its ordered shots."""
 
     premise: str
     style: str
     shots: List[Shot] = field(default_factory=list)
+    locations: dict = field(default_factory=dict)  # name -> fixed visual descriptor

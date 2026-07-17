@@ -77,6 +77,7 @@ def create_episode(series_id: str, req: EpisodeReq):
         "episode": n,
         "title": meta.get("title"),
         "logline": meta.get("logline"),
+        "shots": meta.get("shots", []),  # the script: users see the story the agents planned
         "video_url": f"/api/series/{series_id}/episodes/{n}/video",
         "style": bible.style,
         "characters": _characters(bible),

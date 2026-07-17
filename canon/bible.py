@@ -15,6 +15,7 @@ class Bible:
         self.path = os.path.join(series_dir, "bible.json")
         self.style = ""
         self.characters: dict[str, CharacterSheet] = {}
+        self.locations: dict[str, str] = {}  # place name -> locked visual descriptor
 
     def load(self) -> "Bible":
         if not os.path.exists(self.path):
@@ -31,6 +32,8 @@ class Bible:
             raise ValueError(f"corrupt bible at {self.path}: expected a JSON object")
 
         self.style = str(data.get("style", ""))
+        raw_locs = data.get("locations", {})
+        self.locations = {str(k): str(v) for k, v in raw_locs.items()} if isinstance(raw_locs, dict) else {}
         # Rebuild from known fields only: unknown keys are ignored (not injected as attributes)
         # and malformed character data raises a clear error instead of a cryptic one.
         try:
@@ -51,6 +54,7 @@ class Bible:
         os.makedirs(self.dir, exist_ok=True)
         payload = {
             "style": self.style,
+            "locations": self.locations,
             "characters": {name: vars(c) for name, c in self.characters.items()},
         }
         with open(self.path, "w", encoding="utf-8") as f:

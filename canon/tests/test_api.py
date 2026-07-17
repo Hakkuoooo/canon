@@ -40,3 +40,10 @@ def test_invalid_series_id_is_rejected(tmp_path, monkeypatch):
     monkeypatch.setattr(api, "DATA_ROOT", str(tmp_path))
     r = client.get("/api/series/..%2F..%2Fetc/bible")  # attempted path traversal
     assert r.status_code in (400, 404)  # slug validation refuses it
+
+
+def test_episode_response_includes_script_shots(tmp_path, monkeypatch):
+    monkeypatch.setattr(api, "DATA_ROOT", str(tmp_path))
+    sid = client.post("/api/series").json()["series_id"]
+    r = client.post(f"/api/series/{sid}/episodes", json={"premise": "p", "shots": 2}).json()
+    assert len(r["shots"]) == 2 and {"character", "setting", "action", "dialogue"} <= set(r["shots"][0])

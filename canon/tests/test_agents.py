@@ -78,7 +78,7 @@ def test_parse_script_missing_field_raises():
 def test_write_script_uses_chat_boundary():
     p = FakeProviders(chat_reply=json.dumps(GOOD))
     script, chars = write_script(p, "a heist")
-    assert p.calls["chat"] == 1
+    assert p.calls["chat"] == 2  # writer draft + showrunner review
     assert chars[0].name == "Mara" and len(script.shots) == 2
     assert WRITER_SYS  # a non-empty system prompt is defined
 
@@ -148,3 +148,51 @@ def test_write_script_requests_shot_count():
     p = Recording(chat_reply=json.dumps(GOOD))
     write_script(p, "premise", max_shots=4)
     assert "exactly 4 shots" in p.last_user.lower()
+
+
+# ---- story sync: locations + showrunner review ----
+
+LOCATED = {
+    "style": "flat 2D anime",
+    "locations": [{"name": "vault room", "descriptor": "stone cellar, single hanging bulb, riveted steel door"}],
+    "characters": [{"name": "Mara", "descriptor": "red jacket", "seed": 7}],
+    "shots": [{"character": "Mara", "setting": "vault room", "action": "runs", "dialogue": "go"}],
+}
+
+
+def test_parse_script_reads_locations():
+    script, _ = parse_script(json.dumps(LOCATED), "p")
+    assert script.locations == {"vault room": "stone cellar, single hanging bulb, riveted steel door"}
+
+
+def test_parse_script_defaults_empty_locations():
+    script, _ = parse_script(json.dumps(GOOD), "p")
+    assert script.locations == {}
+
+
+def test_write_script_runs_showrunner_review():
+    class Recording(FakeProviders):
+        def __init__(self, reply):
+            super().__init__(chat_reply=reply)
+            self.seen = []
+
+        def chat(self, system, user):
+            self.seen.append((system, user))
+            return super().chat(system, user)
+
+    p = Recording(json.dumps(GOOD))
+    write_script(p, "a heist")
+    assert p.calls["chat"] == 2  # writer draft + showrunner review
+    review_sys, review_user = p.seen[1]
+    assert "showrunner" in review_sys.lower()
+    assert "a heist" in review_user and "Mara" in review_user  # premise + draft both in review
+
+
+def test_write_script_falls_back_when_review_breaks_json():
+    class BadReviewer(FakeProviders):
+        def chat(self, system, user):
+            self.calls["chat"] += 1
+            return json.dumps(GOOD) if self.calls["chat"] == 1 else "sorry, no json"
+
+    script, chars = write_script(BadReviewer(), "p")
+    assert chars[0].name == "Mara" and len(script.shots) == 2  # draft survives a bad review

@@ -293,3 +293,26 @@ def test_no_dialogue_keeps_plain_motion(tmp_path):
     p = FakeProviders()
     render_shot(Shot(0, "Mara", "vault", "runs"), _bible(tmp_path), p, str(tmp_path))
     assert p.last_motion == "runs"
+
+
+def test_shot_setting_resolves_to_locked_location(tmp_path):
+    b = _bible(tmp_path)
+    b.locations["vault room"] = "stone cellar, single hanging bulb, riveted steel door"
+    p = FakeProviders()
+    shot = render_shot(Shot(0, "Mara", "vault room", "runs"), b, p, str(tmp_path))
+    assert "stone cellar" in shot.prompt  # the place is locked, not re-imagined
+
+
+def test_episode_seeds_and_reuses_locations(tmp_path, monkeypatch):
+    _patch_concat(monkeypatch)
+    ep = json.dumps({
+        "style": "anime",
+        "locations": [{"name": "vault room", "descriptor": "stone cellar, hanging bulb"}],
+        "characters": [{"name": "Mara", "descriptor": "d", "seed": 1}],
+        "shots": [{"character": "Mara", "setting": "vault room", "action": "a"}],
+    })
+    bible = Bible(str(tmp_path))
+    render_episode("p", FakeProviders(chat_reply=ep), str(tmp_path), bible)
+    assert bible.locations["vault room"] == "stone cellar, hanging bulb"
+    reloaded = Bible(str(tmp_path)).load()
+    assert reloaded.locations["vault room"] == "stone cellar, hanging bulb"  # ep2 inherits the room

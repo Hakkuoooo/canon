@@ -57,3 +57,14 @@ def test_load_ignores_unknown_character_keys_and_coerces_seed(tmp_path):
     b = Bible(str(tmp_path)).load()
     assert b.characters["Mara"].seed == 42  # coerced from string
     assert not hasattr(b.characters["Mara"], "evil")  # unknown key not injected
+
+
+def test_bible_persists_locations(tmp_path):
+    from canon.bible import Bible
+
+    b = Bible(str(tmp_path))
+    b.style = "anime"
+    b.locations["vault room"] = "stone cellar, hanging bulb"
+    b.save()
+    reloaded = Bible(str(tmp_path)).load()
+    assert reloaded.locations == {"vault room": "stone cellar, hanging bulb"}

@@ -8,18 +8,21 @@ from canon.schemas import CharacterSheet, Script, Shot
 WRITER_SYS = (
     "You are a short-drama writer. Given a premise, output STRICT JSON only (no prose), with keys: "
     '"style" (string), '
+    '"locations" (list of {"name": string, "descriptor": 10-20 word fixed visual spec of the place}), '
     '"characters" (list of {"name": string, "descriptor": short fixed visual description, "seed": integer}), '
     f'"shots" (list of {{"character": name or null, "setting": string, "action": string, '
     f'"dialogue": string}}, max {MAX_SHOTS}). '
-    "Seeds are distinct integers. The descriptor is a 15-25 word head-to-toe spec that never changes: "
-    "hair, eye colour, face, each garment with colour and construction detail (collar, zip, belt), "
-    "trousers, shoes. Concrete nouns only; the same descriptor is reused to redraw the character in "
-    "every shot, so vague wording causes visual drift. "
-    "The shots must play as ONE continuous scene: each action is a concrete physical moment visible "
-    "in a single frame, caused by the shot before it. Copy the setting text verbatim between shots "
-    "that happen in the same place. For a two-character moment, set character to the main one and "
-    "name the other inside the action. Dialogue is one short spoken line, under 12 words, that "
-    "advances the story; every character shot has one."
+    "Seeds are distinct integers. The character descriptor is a 15-25 word head-to-toe spec that never "
+    "changes: hair, eye colour, face, each garment with colour and construction detail (collar, zip, "
+    "belt), trousers, shoes. Concrete nouns only; the same descriptor is reused to redraw the character "
+    "in every shot, so vague wording causes visual drift. "
+    "Every shot's setting must EXACTLY equal the name of one of your locations; the location descriptor "
+    "is reused to redraw the place, so define it concretely (surfaces, light source, one landmark object). "
+    "The shots are the user's story told in order as ONE continuous scene sequence: each action is a "
+    "concrete physical moment visible in a single frame, caused by the previous shot, and each action "
+    "visibly carries one object or state over from the previous shot. For a two-character moment, set "
+    "character to the main one and name the other inside the action. Dialogue is one short spoken line, "
+    "under 12 words, that advances the story; every character shot has one."
 )
 
 
@@ -53,12 +56,29 @@ def parse_script(raw: str, premise: str, max_shots=None):
     except (KeyError, TypeError, ValueError) as e:
         raise ValueError(f"writer JSON missing/invalid fields: {e}") from e
 
-    return Script(premise=premise, style=str(data.get("style", DEFAULT_STYLE)), shots=shots), chars
+    locations = {
+        str(loc["name"]): str(loc["descriptor"])
+        for loc in data.get("locations", [])
+        if isinstance(loc, dict) and loc.get("name") and loc.get("descriptor")
+    }
+    return Script(premise=premise, style=str(data.get("style", DEFAULT_STYLE)), shots=shots,
+                  locations=locations), chars
 
 
-def write_script(providers, premise: str, known=None, max_shots=None):
-    """Run the Writer agent over the chat() boundary and parse its reply. `max_shots` sets the
-    episode length; `known` (name -> descriptor) makes a later episode reuse the existing cast."""
+SHOWRUNNER_SYS = (
+    "You are the showrunner reviewing a draft episode script against the user's premise. The six "
+    "shots must tell exactly the user's story, in order, as one continuous cause-and-effect scene "
+    "sequence. Fix anything that breaks that: actions that do not follow from the previous shot, "
+    "props or people that appear from nowhere, settings that stray from the defined locations, "
+    "dialogue that does not advance the story, abstract actions that cannot be seen in a single "
+    "frame. Keep the characters, seeds, and locations unchanged. Return the corrected script as "
+    "the same STRICT JSON shape only, no prose."
+)
+
+
+def write_script(providers, premise: str, known=None, max_shots=None, known_locations=None):
+    """Writer drafts, Showrunner reviews the draft against the premise, then parse. `max_shots`
+    sets episode length; `known` / `known_locations` make later episodes reuse the existing canon."""
     cap = max_shots or MAX_SHOTS
     parts = [premise, f"Write exactly {cap} shots."]
     if known:
@@ -67,7 +87,19 @@ def write_script(providers, premise: str, known=None, max_shots=None):
             "This is a later episode of an existing series. REUSE these exact characters "
             f"(same names and looks), do not invent new ones: {roster}"
         )
-    return parse_script(providers.chat(WRITER_SYS, "\n\n".join(parts)), premise, cap)
+    if known_locations:
+        places = "; ".join(f"{n}: {d}" for n, d in known_locations.items())
+        parts.append(f"REUSE these exact locations (same names and specs) where the story allows: {places}")
+    request = "\n\n".join(parts)
+    draft = providers.chat(WRITER_SYS, request)
+    reviewed = providers.chat(
+        SHOWRUNNER_SYS,
+        f"USER PREMISE:\n{request}\n\nDRAFT SCRIPT JSON:\n{draft}\n\nKeep exactly {cap} shots.",
+    )
+    try:
+        return parse_script(reviewed, premise, cap)
+    except ValueError:  # a review that breaks the JSON must not cost us the episode
+        return parse_script(draft, premise, cap)
 
 
 def _extract_json(raw):
