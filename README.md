@@ -4,17 +4,21 @@
 
 Built for the Global AI Hackathon Series with Qwen Cloud — **AI Showrunner** track.
 
-Most "AI video" tools generate a single disconnected clip. Canon runs the actual showrunner job end to end (script → cast → shot list → generation → self-correcting QC → edit) and its wedge is **cross-episode character consistency**: a persistent Story Bible locks each character's look and seed, and a Qwen-VL critic re-rolls any shot that drifts. Generate episode 1, then episode 2, and the character is the same person.
+Most "AI video" tools generate a single disconnected clip. Canon runs the actual showrunner job end to end (script → review → cast → shot list → generation → self-correcting QC → edit), and the user's typed premise is the contract: the episode on screen tells that story. Its wedge is **persistent canon**: a Story Bible locks each character's look and seed *and each location's visual spec*, so episode 2 has the same faces in the same rooms as episode 1.
 
 ## How it works
 
-Four cooperating agents share one persistent state object (the Story Bible):
+Cooperating agents share one persistent state object (the Story Bible):
 
-1. **Writer** (Qwen) — premise → structured script + cast.
-2. **Story Bible** — persists each character's locked descriptor + seed + reference image. Episode 2+ reuses it unchanged; this is the consistency mechanism.
-3. **Cinematographer / Generator** — assembles each shot's prompt from the Bible, generates a keyframe and motion.
-4. **QC Critic** (Qwen-VL) — checks each shot against the Bible and regenerates on drift (capped).
-5. **Editor** (ffmpeg) — stitches shots, adds voice and subtitles.
+1. **Writer** (Qwen) — premise → structured script: locked locations, cast with head-to-toe descriptors, and shots that chain cause-to-effect with a spoken line each.
+2. **Showrunner** (Qwen) — reviews the draft against the user's premise and repairs broken continuity, vanishing props, and non-advancing dialogue before any pixel is paid for.
+3. **Story Bible** — persists every character's locked descriptor + seed + reference image and every location's locked spec. Later episodes load it unchanged; this is the consistency mechanism.
+4. **Cinematographer** (Qwen) — one camera direction per shot.
+5. **Generator** (Wan) — renders each shot's still (locked character + locked place + action), then animates it; dialogue rides into the video model so characters perform their lines.
+6. **QC Critic** (Qwen-VL) — checks every frame against the Bible and re-rolls drift (capped).
+7. **Editor** (Qwen + ffmpeg) — titles the episode, opens it on a generated title card, burns each line as a caption, stitches the cut.
+
+The UI shows honest progress while an episode renders (the engine reports every stage live), and a series survives page reloads via its `?series=` URL.
 
 See [canon/architecture.md](canon/architecture.md) for diagrams, the data model, the key trade-off, and failure modes.
 
@@ -52,9 +56,9 @@ DASHSCOPE_API_KEY=... .venv/bin/python -m canon.spikes.spike_providers
 
 ## Alibaba Cloud services
 
-- **Model Studio (DashScope)** — Qwen (script/orchestration), Qwen-VL (QC), Wan / HappyHorse (video), CosyVoice (TTS).
-- **ECS** — hosts the API + built frontend. See [canon/deploy/ecs-setup.md](canon/deploy/ecs-setup.md).
-- **OSS** — stores generated episode assets.
+- **Model Studio (DashScope, International/Singapore endpoint)** — verified callable models: `qwen-plus` (writing, review, framing, titles), `qwen3-vl-plus` (visual consistency check), `wan2.5-t2i-preview` (stills), `wan2.6-i2v-flash` (image-to-video with generated audio). All ids overridable via `CANON_*` env vars.
+- **Simple Application Server** — hosts the deployed API. See [canon/deploy/ecs-setup.md](canon/deploy/ecs-setup.md).
+- Episode assets live on a per-series filesystem workspace (`canon/data/series/<id>/`); no database.
 
 ## Layout
 
