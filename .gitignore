@@ -4,4 +4,3 @@ canon/data/
 .env
 node_modules/
 web/dist/
-.claude/
